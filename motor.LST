@@ -1,0 +1,104 @@
+C51 COMPILER V9.00   MOTOR                                                                 04/07/2018 14:54:07 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MOTOR
+OBJECT MODULE PLACED IN motor.OBJ
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil\C51\BIN\C51.EXE motor.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include"motor.h"
+*** ERROR C202 IN LINE 17 OF MOTOR.H: 'P2': undefined identifier
+*** ERROR C202 IN LINE 18 OF MOTOR.H: 'P2': undefined identifier
+*** ERROR C202 IN LINE 19 OF MOTOR.H: 'P2': undefined identifier
+   2          #include<intrins.h>
+   3          
+   4          #define uchar unsigned char
+   5          #define uint  unsigned int
+   6          
+   7          
+   8          uchar code CCW[8]={0x08,0x0c,0x04,0x06,0x02,0x03,0x01,0x09};   //逆时针旋转相序表
+   9          uchar code CW[8] ={0x09,0x01,0x03,0x02,0x06,0x04,0x0c,0x08};   //正时针旋转相序表
+  10          
+  11          void delay(int xms)             //建议10ms
+  12          {
+  13   1        uchar i, j;
+  14   1        for(i=0;i<xms;++i)
+  15   1          for(j=0;j<110;++j);
+  16   1      }
+  17          void fRot_hot(int degree,int speed)
+  18          {
+  19   1        int i;
+  20   1        float j=degree*1.4;
+  21   1        mc1=1;
+*** ERROR C202 IN LINE 21 OF MOTOR.C: 'mc1': undefined identifier
+  22   1        mc2=0;
+*** ERROR C202 IN LINE 22 OF MOTOR.C: 'mc2': undefined identifier
+  23   1        mc3=0;
+*** ERROR C202 IN LINE 23 OF MOTOR.C: 'mc3': undefined identifier
+  24   1        for(;j>=0;--j) 
+  25   1        for(i=0;i<8;++i)
+  26   1        {     
+  27   2              P1=CW[i];
+*** ERROR C202 IN LINE 27 OF MOTOR.C: 'P1': undefined identifier
+  28   2              delay(speed);  
+  29   2        }      
+  30   1      }
+  31          void rRot_cold(int degree,int speed)
+  32          {
+  33   1        int i;
+  34   1        float j=degree*1.4;
+  35   1        mc1=1;
+*** ERROR C202 IN LINE 35 OF MOTOR.C: 'mc1': undefined identifier
+  36   1        mc2=0;
+*** ERROR C202 IN LINE 36 OF MOTOR.C: 'mc2': undefined identifier
+  37   1        mc3=0;
+*** ERROR C202 IN LINE 37 OF MOTOR.C: 'mc3': undefined identifier
+  38   1        for(;j>=0;--j) 
+  39   1        for(i=0;i<8;++i)
+  40   1        {     
+  41   2              P1=CCW[i];
+*** ERROR C202 IN LINE 41 OF MOTOR.C: 'P1': undefined identifier
+  42   2              delay(speed);  
+  43   2        }
+  44   1      }
+C51 COMPILER V9.00   MOTOR                                                                 04/07/2018 14:54:07 PAGE 2   
+
+  45          void fRot_cold(int degree,int speed)
+  46          {
+  47   1        int i;
+  48   1        float j=degree*1.4;
+  49   1        mc1=0;
+*** ERROR C202 IN LINE 49 OF MOTOR.C: 'mc1': undefined identifier
+  50   1        mc2=1;
+*** ERROR C202 IN LINE 50 OF MOTOR.C: 'mc2': undefined identifier
+  51   1        mc3=0;
+*** ERROR C202 IN LINE 51 OF MOTOR.C: 'mc3': undefined identifier
+  52   1        for(;j>=0;--j) 
+  53   1        for(i=0;i<8;++i)
+  54   1        {     
+  55   2              P1=CW[i];
+*** ERROR C202 IN LINE 55 OF MOTOR.C: 'P1': undefined identifier
+  56   2              delay(speed);  
+  57   2        }      
+  58   1      }
+  59          void rRot_hot(int degree,int speed)
+  60          {
+  61   1        int i;
+  62   1        float j=degree*1.4;
+  63   1        mc1=0;
+*** ERROR C202 IN LINE 63 OF MOTOR.C: 'mc1': undefined identifier
+  64   1        mc2=1;
+*** ERROR C202 IN LINE 64 OF MOTOR.C: 'mc2': undefined identifier
+  65   1        mc3=0;
+*** ERROR C202 IN LINE 65 OF MOTOR.C: 'mc3': undefined identifier
+  66   1        for(;j>=0;--j) 
+  67   1        for(i=0;i<8;++i)
+  68   1        {     
+  69   2              P1=CCW[i];
+*** ERROR C202 IN LINE 69 OF MOTOR.C: 'P1': undefined identifier
+  70   2              delay(speed);  
+  71   2        }
+  72   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  19 ERROR(S)

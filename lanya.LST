@@ -1,0 +1,57 @@
+C51 COMPILER V9.00   LANYA                                                                 04/23/2018 22:22:32 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE LANYA
+OBJECT MODULE PLACED IN lanya.OBJ
+COMPILER INVOKED BY: D:\C51\BIN\C51.EXE lanya.c COMPACT BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include"lanya.h"
+   2          
+   3          void lanya_init(void)                           //串口初始化
+   4          {
+   5   1               EA=0; //暂时关闭中断
+   6   1               TMOD&=0x0F;  //定时器1模式控制在高4位
+   7   1               TMOD|=0x20;    //定时器1工作在模式2，自动重装模式
+   8   1               SCON=0x50;     //串口工作在模式1(最常用模式)
+   9   1               TH1=0xfd;  //定时器重装值对应波特率9600         
+  10   1               TL1=0xfd;
+  11   1               ES=1;         //串行中断允许
+  12   1               TR1=1;        //启动定时器1
+  13   1               REN=1;        //允许接收 
+  14   1               EA=1;         //允许中断
+  15   1      }
+  16           /*******************************************************************************
+  17          * 函 数 名         : void uart_send(char *a)
+  18          * 函数功能                 : 蓝牙串口发送字符串
+  19          * 输    入         : 字符串指针
+  20          * 输    出         : 无
+  21          *******************************************************************************/
+  22          void uart_send(char *a)
+  23          {
+  24   1                char *b=a;
+  25   1                ES=0;  //发送时关闭中断,防止进入接收中断
+  26   1                while(*b!=0)
+  27   1                {
+  28   2                       SBUF=*b;
+  29   2                       b++;
+  30   2                       while(!TI);
+  31   2                       TI=0;
+  32   2                }
+  33   1                ES=1;
+  34   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     52    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

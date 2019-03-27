@@ -1,0 +1,676 @@
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: D:\C51\BIN\C51.EXE main.c COMPACT BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <STC12C5A60S2.h>
+   2          #include <intrins.h>
+   3          #include<stdio.h>
+   4          #include<math.h>
+   5          #include"lanya.h"
+   6          #include"pid.h"
+   7          #include"ds18b20.h"
+   8          //#include"E2PROM.h"
+   9          #include"lcd.h"
+  10          #include"font.h"
+  11          #include"sys.h"
+  12          
+  13          /***************×¢ÒâÊÂÏî************************/
+  14          /*
+  15          1¡¢ Ôö¼ÓĞòÁĞºÅ¶ÁÈ¡ºó£¬²»ÒªÔÙÓÃÊÖêşµç»ú£¬·ñÔò¼ÇÂ¼µÄĞòÁĞºÅ
+  16                  ²»ÄÜÔÚ¶¬¼¾Ä£Ê½ÏÂÈÃË®¹ÜÕıÈ·µÄ¹Ø±Õ»ò´ò¿ª. °´×î×ó±ß°´¼ü¼ÇÒäE2PROM
+  17                                  */
+  18          /***************io¿ÚÉùÃ÷************************/
+  19          
+  20          //µç»ú¿ØÖÆ(motor_control)
+  21          sbit MC_hui=P2^0;        //ÀäË®»ØÁ÷ 
+  22          sbit MC_right=P2^1;       //ÓÒ±ß
+  23          sbit MC_left=P2^2;  //×ó±ß
+  24          //µç»úÊä³ö(motor_port)
+  25          #define M_PORT P1 //Ö»Ê¹ÓÃµÍËÄÎ»
+  26          
+  27          //°´¼ü
+  28          sbit k1 =P3^2;
+  29          sbit k2 =P3^3;
+  30          sbit k3 =P3^4;
+  31          
+  32          
+  33          /***************È«¾Ö±äÁ¿ÉùÃ÷************************/
+  34          uchar code CW[8] ={0x09,0x01,0x03,0x02,0x06,0x04,0x0c,0x08};   //ÕıÊ±ÕëĞı×ªÏàĞò±í
+  35          uint T0_num=0;         //ÓÃÓÚ¶¨Ê±Æ÷0¼ÆÊı
+  36          uint T1_num=0;
+  37          uint T0_motor_num=0;   //ÓÃÓÚµç»úÂö³åÆµÂÊ¼ÆÊ±
+  38          float tar_temp=0;   //Ä¬ÈÏÄ¿±êÎÂ¶È
+  39          float cur_temp=0;       //µ±Ç°ÎÂ¶È
+  40          char lanya_get=0;                //À¶ÑÀ»ñµÃÎÂ¶È,×Ö·û'2'Îª50      '<'Îª60,'F'Îª70£¬'P'Îª80
+  41          uchar yemian=0;                  //ÓÃ»§½çÃæ±êÖ¾£¬1ÎªÑ¡Ôñ¼¾½ÚÒ³Ãæ£¬2ÎªÑ¡ÔñÎÂ¶ÈÒ³Ãæ
+  42          uchar flag_season=0;    //1Îª¶¬¼¾£¬2ÎªÏÄ¼¾
+  43          char flag_hui=0;      //»ØÁ÷µç»úÕı·´´òËÀ±êÖ¾,1ÎªÄæÊ±Õë´òËÀ£¬2ÎªË³Ê±Õë´òËÀ
+  44          static uint motor1_xulie=22000;   //µç»úË³Ê±Õë×ª¶¯ĞòÁĞÔö´ó
+  45          static uint motor2_xulie=22000;   //22000µÄÊ±ºò×óµç»úÈ«¹Ø£¬ÓÒµç»úÈ«¹Ø
+  46          static uint hui_xulie=2200;        //²»ÓÃÈ«¿ª
+  47          uchar update_flag=0;
+  48          uchar flag_exit=0;
+  49          /*//ÒÔÏÂÎªÀ¶ÑÀtest
+  50          char code str2[]="current : ";
+  51          char temperature[10];
+  52           
+  53          char test1[10];
+  54          
+  55          uint xulie=0;
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 2   
+
+  56          char test2[10];
+  57          */
+  58          char tar_tem[10];
+  59          /***************º¯ÊıÉùÃ÷************************/
+  60          void delay(uint xms);    //ºÁÃë¼¶Èí¼şÑÓÊ±
+  61          void T0_init();          //¶¨Ê±Æ÷T0³õÊ¼»¯ 1ms
+  62          void T1_init();                  //¶¨Ê±Æ÷T1³õÊ¼»¯ 20ms 
+  63          void season();            //Ñ¡Ôñ¼¾½ÚÒ³Ãæ
+  64          void winter();                     //¶¬¼¾½ø³Ì
+  65          void summer();                     //ÏÄ¼¾½ø³Ì
+  66          void send_init();        //À¶ÑÀ·¢ËÍµ±Ç°ÎÂ¶È¡¢ÌáÊ¾ÓÃ»§ÊäÈëÎÂ¶È
+  67          void motor_init();       //µç»ú³õÊ¼»¯³ÌĞò ÇåÁãmc1 mc2 mc3
+  68          
+  69          void lcd_show_season();    //Ñ¡Ôñ¼¾½Ú
+  70          void lcd_clr_season();
+  71          
+  72          void lcd_show_open();      //ÌáĞÑÓÃ»§¿ªË®
+  73          void lcd_clr_open();
+  74          
+  75          void lcd_show_info();      //ÏÔÊ¾µ±Ç°ÎÂ¶È  
+  76          void lcd_clr_info();        
+  77          void lcd_update_tmp();    //ÎÂ¶È¸üĞÂ
+  78          
+  79          
+  80          /***************Ö÷³ÌĞò************************/
+  81          void main()
+  82          {        
+  83   1        motor_init();
+  84   1        Lcd_Init();
+  85   1        LCD_Clear(BLACK);
+  86   1        //welcome
+  87   1      //      motor1_xulie=0;
+  88   1      //      motor2_xulie=0;
+  89   1      //  motor1_xulie=word_read(0x2000);      //Ò»¶¨ÏÈ¶Á³öÉÏ´Î¶ÏµçÊ±Ğ´ÈëµÄĞòÁĞºÅ£¨Îªwinter×¼±¸£©£¬±ÜÃâ»¹Î´¶Á³ö¾Í±»¶
+             -¨Ê±Ğ´³ÌĞò¸²¸Ç
+  90   1      
+  91   1      //  lanya_init();               //bluetooth³õÊ¼»¯;
+  92   1      
+  93   1        cur_temp=(float)ds_gettmp()/10;        //»ñÈ¡µ±Ç°ÎÂ¶È
+  94   1      
+  95   1      //  while(lanya_get==0);          //µÈ´ıÓÃ»§ÊäÈë¿ªÆôÖ¸Áî
+  96   1               
+  97   1        T0_init();            //°´¼ü£¨10ms¼ì²âÒ»´Î£©¡¢µç»ú(time_out ms·¢ËÍÒ»´ÎĞòÁĞ)
+  98   1        T1_init();            //tftÆÁÄ»³õÊ¼»¯,²»ÄÜºÍÀ¶ÑÀÒ»ÆğÓÃ
+  99   1      //  sprintf(test2,"%d",motor1_xulie);
+ 100   1      //  uart_send(test2);
+ 101   1        season();        //µÈ´ıÑ¡Ôñ¼¾½Úwinter/summer
+ 102   1        if(flag_season==1)
+ 103   1               winter();
+ 104   1        else
+ 105   1               summer();
+ 106   1      //   while(motor2_xulie<22000) //¶¼×óÓÒµç»úÄæÊ±Õë´òËÀ(ÈÈË®È«¿ª)
+ 107   1      //      {
+ 108   1      //          update_flag=1;//update temp. flag
+ 109   1      //              
+ 110   1      //              time_out_flag=2; 
+ 111   1      //              time_out=1;
+ 112   1      //      }
+ 113   1      //      time_out=15000;    //ÖÃ»ØÎŞÏŞ´ó×´Ì¬
+ 114   1      ////    flag_hui=1;  //¿ª»ØÁ÷Ë®¹Ü
+ 115   1      
+ 116   1      
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 3   
+
+ 117   1      //      hui_xulie=0;
+ 118   1      //      flag_hui=2;
+ 119   1        while(1);
+ 120   1      
+ 121   1        
+ 122   1      }
+ 123          
+ 124          void lcd_show_season()
+ 125          {
+ 126   1        //ÌáÊ¾Óï¾ä
+ 127   1        LCD_ShowString(5*8,0*16,"Select");
+ 128   1        LCD_ShowString(6*8,1*16+8,"the");
+ 129   1        LCD_ShowString(5*8,3*16,"current");
+ 130   1        LCD_ShowString(5*8,4*16+8,"season");
+ 131   1        LCD_ShowString(5*8,6*16,"please");
+ 132   1        //·Ö¸îÏß
+ 133   1        LCD_DrawLine(0+4,9*16-3,127-4,9*16-3);
+ 134   1        LCD_DrawLine(5*8+4,9*16-3,5*8+4,160);
+ 135   1        LCD_DrawLine(10*8+4,9*16-3,10*8+4,160);
+ 136   1        LCD_DrawLine(0+4,9*16-3,0+4,160);
+ 137   1        LCD_DrawLine(127-4,9*16-3,127-4,160);
+ 138   1        //°´Å¥¹¦ÄÜÌáÊ¾
+ 139   1        LCD_ShowString(1*8,9*16,"NULL");
+ 140   1        LCD_ShowString(6*8,9*16,"SUM.");
+ 141   1        LCD_ShowString(11*8,9*16,"WIN.");
+ 142   1      }
+ 143          
+ 144          void lcd_clr_season()
+ 145          {
+ 146   1        LCD_ShowString(5*8,0*16,"      ");
+ 147   1        LCD_ShowString(6*8,1*16+8,"   ");
+ 148   1        LCD_ShowString(5*8,3*16,"       ");
+ 149   1        LCD_ShowString(5*8,4*16+8,"      ");
+ 150   1        LCD_ShowString(5*8,6*16,"      ");
+ 151   1      
+ 152   1        LCD_ShowString(1*8,9*16,"    ");
+ 153   1        LCD_ShowString(6*8,9*16,"    ");
+ 154   1        LCD_ShowString(11*8,9*16,"    ");             
+ 155   1      }
+ 156          
+ 157          void lcd_show_open()
+ 158          {
+ 159   1        LCD_ShowString(6*8,0*16,"You");
+ 160   1        LCD_ShowString(6*8,1*16+8,"can");
+ 161   1        LCD_ShowString(6*8,3*16,"open");
+ 162   1        LCD_ShowString(6*8,4*16+8,"the");
+ 163   1        LCD_ShowString(5*8,6*16,"vavle");
+ 164   1        
+ 165   1        //°´Å¥¹¦ÄÜÌáÊ¾
+ 166   1        LCD_ShowString(1*8,9*16,"NULL");
+ 167   1        LCD_ShowString(6*8,9*16,"NULL");
+ 168   1        LCD_ShowString(11*8,9*16,"NULL");  
+ 169   1      }
+ 170          void lcd_clr_open()
+ 171          {
+ 172   1        LCD_ShowString(6*8,0*16,"   ");
+ 173   1        LCD_ShowString(6*8,1*16+8,"   ");
+ 174   1        LCD_ShowString(6*8,3*16,"    ");
+ 175   1        LCD_ShowString(6*8,4*16+8,"   ");
+ 176   1        LCD_ShowString(5*8,6*16,"     ");
+ 177   1        
+ 178   1        //°´Å¥¹¦ÄÜÌáÊ¾
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 4   
+
+ 179   1        LCD_ShowString(1*8,9*16,"NULL");
+ 180   1        LCD_ShowString(6*8,9*16,"NULL");
+ 181   1        LCD_ShowString(11*8,9*16,"NULL");
+ 182   1      }
+ 183          void lcd_show_info()
+ 184          {
+ 185   1        LCD_ShowString(0,0*16,"target TEMP. :");
+ 186   1        LCD_ShowString(4*8,1*16+8,"    ");LCD_ShowChar(8*8+4,16+8-7,'.',0);LCD_ShowChar(9*8,16+8,'C',0);
+ 187   1       // LCD_ShowString(0,3*16,"Too High");
+ 188   1        LCD_ShowString(0,5*16,"current TEMP. :");
+ 189   1        LCD_ShowString(4*8,6*16+8,"    ");LCD_ShowChar(8*8+4,6*16-7+8,'.',0);LCD_ShowChar(9*8,6*16+8,'C',0);
+ 190   1        
+ 191   1        //°´Å¥¹¦ÄÜÌáÊ¾
+ 192   1        LCD_ShowString(1*8,9*16,"CLS.");
+ 193   1        LCD_ShowString(6*8,9*16," -  ");
+ 194   1        LCD_ShowString(11*8,9*16,"  + ");
+ 195   1      }
+ 196          
+ 197          void lcd_clr_info()
+ 198          {
+ 199   1      
+ 200   1        LCD_ShowString(0,0*16,"              ");
+ 201   1        LCD_ShowString(4*8,1*16+8,"    ");LCD_ShowChar(8*8+4,16+8-7,' ',0);LCD_ShowChar(9*8,16+8,' ',0);
+ 202   1        LCD_ShowString(0,3*16,"        ");
+ 203   1        LCD_ShowString(0,5*16,"               ");
+ 204   1        LCD_ShowString(4*8,6*16+8,"    ");LCD_ShowChar(8*8+4,6*16-7+8,' ',0);LCD_ShowChar(9*8,6*16+8,' ',0);
+ 205   1        
+ 206   1        //°´Å¥¹¦ÄÜÌáÊ¾
+ 207   1        LCD_ShowString(1*8,9*16,"    ");
+ 208   1        LCD_ShowString(6*8,9*16,"    ");
+ 209   1        LCD_ShowString(11*8,9*16,"    ");
+ 210   1      }
+ 211          
+ 212          
+ 213          
+ 214          void delay(uint xms)
+ 215          {
+ 216   1        while(--xms)
+ 217   1        {
+ 218   2              unsigned char i, j;
+ 219   2              _nop_();
+ 220   2              i = 11;
+ 221   2              j = 100;
+ 222   2              do
+ 223   2              {
+ 224   3                      while (--j);
+ 225   3              } while (--i);  
+ 226   2        }
+ 227   1      }
+ 228          
+ 229          void T0_init()
+ 230          {
+ 231   1        AUXR &= 0x7F;         //¶¨Ê±Æ÷Ê±ÖÓ12TÄ£Ê½
+ 232   1      
+ 233   1        TMOD &= 0xF0;         //ÉèÖÃ¶¨Ê±Æ÷Ä£Ê½
+ 234   1        TMOD |= 0x01;         //ÉèÖÃ¶¨Ê±Æ÷Ä£Ê½
+ 235   1      
+ 236   1        TL0 = 0x66;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 237   1        TH0 = 0xFC;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 238   1      
+ 239   1        ET0 = 1; //ÔÊĞíT0ÖĞ¶Ï
+ 240   1        EA  = 1; //¿ª·ÅÖĞ¶Ï
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 5   
+
+ 241   1        TR0 = 1;
+ 242   1      }
+ 243          
+ 244          void T1_init()
+ 245          {
+ 246   1        AUXR &= 0xBF;         //¶¨Ê±Æ÷Ê±ÖÓ12TÄ£Ê½
+ 247   1      
+ 248   1        TMOD &= 0x0F;         //ÉèÖÃ¶¨Ê±Æ÷Ä£Ê½
+ 249   1        TMOD |= 0x10;         //ÉèÖÃ¶¨Ê±Æ÷Ä£Ê½
+ 250   1      
+ 251   1        TL1 = 0x00;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 252   1        TH1 = 0xB8;           //ÉèÖÃ¶¨Ê±³õ
+ 253   1      
+ 254   1        ET1 = 1; //ÔÊĞíT1ÖĞ¶Ï
+ 255   1        EA  = 1; //¿ª·ÅÖĞ¶Ï
+ 256   1        TR1 = 1;
+ 257   1      }
+ 258          
+ 259          /***************ÖĞ¶Ï´¦Àí³ÌĞò************************/
+ 260          void T0_timer() interrupt 1                     //1ms
+ 261          {
+ 262   1      
+ 263   1        static uchar motor1_index=0;
+ 264   1        static uchar motor2_index=0;
+ 265   1        static uchar motor3_index=0;
+ 266   1        ET0=0;
+ 267   1       
+ 268   1        
+ 269   1        TL0 = 0x66;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 270   1        TH0 = 0xFC;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 271   1        ++T0_num;
+ 272   1      
+ 273   1        if(T0_num>=100)       //100ms
+ 274   1         {
+ 275   2               T0_num=0;
+ 276   2      //       flag=1;
+ 277   2         }
+ 278   1      /***************°´¼ü²¿·Ö**************/
+ 279   1        if(T0_num%10==0) //·ÇÕ¼ÓÃÊ½°´¼ü10msË¢ĞÂÒ»´Î
+ 280   1        {
+ 281   2       //             static unsigned char keylast3;
+ 282   2                      if(yemian==1)    //ÔÚÒ³ÃæÒ»Ê±°´¼üÓÃ×÷Ñ¡Ôñ¼¾½Ú
+ 283   2                      {
+ 284   3                              static unsigned char keylast1,keylast2; //±£´æÉÏ´ÎµÄ°´¼üÖµ
+ 285   3                              if(k1==0 && keylast1==1)        //¼ì²âµ½Ò»¸öÏÂ½µÑØ
+ 286   3                              {
+ 287   4                                  flag_season=1;        //¶¬¼¾
+ 288   4                                      tar_temp=45;      //³õÊ¼Ä¿±êÎÂ¶ÈÎª65
+ 289   4                              }
+ 290   3                              keylast1=k1;
+ 291   3                              if(k2==0 && keylast2==1)        //¼ì²âµ½Ò»¸öÏÂ½µÑØ
+ 292   3                              {
+ 293   4                                  flag_season=2;                      //ÏÄ¼¾
+ 294   4                                      tar_temp=40;                    //³õÊ¼ÎÂ¶ÈÎª
+ 295   4                              }
+ 296   3                              keylast2=k2;
+ 297   3                      }
+ 298   2                      if(yemian==2||yemian==3)         //ÔÚÒ³Ãæ¶şÈıÊ±°´¼üÓÃ×÷¼Ó¼õÎÂ¶È
+ 299   2                      {
+ 300   3                              static unsigned char keylast1,keylast2,keylast3;        //±£´æÉÏ´ÎµÄ°´¼üÖµ
+ 301   3                              if(k1==0 && keylast1==1)        //¼ì²âµ½Ò»¸öÏÂ½µÑØ
+ 302   3                              {
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 6   
+
+ 303   4                                  tar_temp++;
+ 304   4                              }
+ 305   3                              keylast1=k1;
+ 306   3                              if(k2==0 && keylast2==1)        //¼ì²âµ½Ò»¸öÏÂ½µÑØ
+ 307   3                              {
+ 308   4                                  tar_temp--;
+ 309   4                              }
+ 310   3                              keylast2=k2;
+ 311   3                              if(k3==0 && keylast3==1)        //¼ì²âµ½Ò»¸öÏÂ½µÑØ
+ 312   3                              {
+ 313   4                                      flag_exit=1;
+ 314   4                              }
+ 315   3                              keylast3=k3;
+ 316   3                                      
+ 317   3                      }
+ 318   2      
+ 319   2        }
+ 320   1      
+ 321   1      /***************µç»úÇı¶¯²¿·Ö**************/
+ 322   1        ++T0_motor_num;
+ 323   1        if(T0_motor_num>=time_out)
+ 324   1        {
+ 325   2          T0_motor_num=0;
+ 326   2      
+ 327   2              MC_left=1; //¿ª×óµç»ú
+ 328   2          M_PORT=CW[motor1_index];
+ 329   2              if(time_out_flagleft==2) //Ìõ¼şÎªÕæ Ôò½µÎÂ ¼´ÓÒ×ª
+ 330   2              {
+ 331   3               ++motor1_index;
+ 332   3                       motor1_xulie++;
+ 333   3                       if(motor1_xulie>22000)   //·ÀÖ¹´òËÀºóĞòÁĞÈÎÈ»¼Ó
+ 334   3                              motor1_xulie=22000;
+ 335   3              }     
+ 336   2              if(time_out_flagleft==0)
+ 337   2              {
+ 338   3                        --motor1_index;   //
+ 339   3                        motor1_xulie--;
+ 340   3                        if(motor1_xulie>60000)
+ 341   3                               motor1_xulie=0;
+ 342   3              }
+ 343   2          MC_left=0;   //¹Ø×óµç»ú
+ 344   2      
+ 345   2              MC_right =1; //¿ªµç»úÓÒ 
+ 346   2              M_PORT=CW[motor2_index];
+ 347   2              if(time_out_flagright==0) //Ìõ¼şÎªÕæ ÔòÉıÎÂ ¼´ÏòÓÒ×ª
+ 348   2              {
+ 349   3                ++motor2_index;
+ 350   3                motor2_xulie++;
+ 351   3                if(motor2_xulie>22000)
+ 352   3                              motor2_xulie=22000;
+ 353   3              }     
+ 354   2              if(time_out_flagright==2)
+ 355   2              {
+ 356   3                --motor2_index;
+ 357   3                motor2_xulie--;
+ 358   3                if(motor2_xulie>60000)
+ 359   3                               motor2_xulie=0;
+ 360   3              }    
+ 361   2              MC_right=0;   //¹ØÓÒµç»ú         
+ 362   2      
+ 363   2      
+ 364   2              //motor1_indexÒç³ö´¦Àí
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 7   
+
+ 365   2              if(motor1_index==8)
+ 366   2                motor1_index=0;
+ 367   2              else if(motor1_index==255)
+ 368   2                motor1_index=7;
+ 369   2          //motor2_indexÒç³ö´¦Àí
+ 370   2              if(motor2_index==8)
+ 371   2                motor2_index=0;
+ 372   2              else if(motor2_index==255)
+ 373   2                motor2_index=7;
+ 374   2        }
+ 375   1        if(T0_num%1==0)
+ 376   1        {
+ 377   2                 if(flag_hui==1)        //ÄæÊ±ÕëÈ«¿ª»ØÁ÷µç»ú
+ 378   2                      {
+ 379   3                              MC_hui=1;
+ 380   3                              M_PORT=CW[motor3_index];
+ 381   3                              --motor3_index;
+ 382   3                              hui_xulie--;
+ 383   3                              MC_hui=0;
+ 384   3                              if(hui_xulie==0||hui_xulie>60000)
+ 385   3                                      flag_hui=0;                     
+ 386   3                      }
+ 387   2                      if(flag_hui==2)   //Ë³Ê±Õë
+ 388   2                      {
+ 389   3                              MC_hui=1;
+ 390   3                              M_PORT=CW[motor3_index];
+ 391   3                              ++motor3_index;
+ 392   3                              hui_xulie++;
+ 393   3                              MC_hui=0;
+ 394   3                              if(hui_xulie>2200)
+ 395   3                                      flag_hui=0;                     
+ 396   3                      }
+ 397   2                      if(motor3_index==8)
+ 398   2                        motor3_index=0;
+ 399   2                      else if(motor3_index==255)
+ 400   2                        motor3_index=7;
+ 401   2          }
+ 402   1              ET0=1;
+ 403   1      
+ 404   1        
+ 405   1       }
+ 406          void T1_timer() interrupt 3
+ 407          {
+ 408   1        TL1 = 0x00;           //ÉèÖÃ¶¨Ê±³õÖµ
+ 409   1        TH1 = 0xB8;           //ÉèÖÃ¶¨Ê±³õ
+ 410   1      
+ 411   1        ++T1_num;
+ 412   1        if(T1_num>=50)        //×î´ó¼ÆÊıµ½50*20ms
+ 413   1          T1_num=0;   
+ 414   1              
+ 415   1              
+ 416   1              if(T1_num%5==0)
+ 417   1                      if(update_flag==1)
+ 418   1                         {
+ 419   2                               EA=0;
+ 420   2                               lcd_update_tmp();
+ 421   2                               EA=1;  
+ 422   2                              }
+ 423   1      } 
+ 424          
+ 425          void motor_init()
+ 426          {
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 8   
+
+ 427   1        M_PORT = 0x00;
+ 428   1      
+ 429   1        MC_left=0;
+ 430   1        _nop_();
+ 431   1        MC_hui=0;
+ 432   1        _nop_();
+ 433   1        MC_right=0;
+ 434   1        _nop_();
+ 435   1      }
+ 436          void uart(void) interrupt 4              //´®¿Ú½ÓÊÕÖĞ¶Ï
+ 437          {
+ 438   1      
+ 439   1               RI=0;  //ÇåÖĞ¶ÏÇëÇó
+ 440   1               lanya_get=SBUF;        //È¡Öµ
+ 441   1      }
+ 442          void send_init()
+ 443          {   
+ 444   1          char code str1[]="please enter temperature: ";
+ 445   1      //      sprintf(temperature,"%.1f",cur_temp);
+ 446   1      //      uart_send(str2);
+ 447   1      ///     uart_send(temperature);
+ 448   1              uart_send(str1);
+ 449   1      }
+ 450          
+ 451          void season()
+ 452          {
+ 453   1              lcd_show_season();
+ 454   1              yemian=1;        //Ò³Ãæ±êÖ¾
+ 455   1              while(!flag_season);
+ 456   1      }
+ 457          void summer()    //flag_season=2
+ 458          {
+ 459   1      //      uchar flag_wen=0;
+ 460   1      //      float temp_last;
+ 461   1              yemian=3;
+ 462   1              lcd_clr_season();
+ 463   1              lcd_show_info();        
+ 464   1              while(motor1_xulie>11000&&motor1_xulie<=22000) //¶¼×óµç»ú×ó×ª´òÒ»°ë£¬ÓÒµç»úÓÒ×ª´òÒ»°ë(ÀäÈÈË®¶¼ÔÚÖĞ¼ä)
+ 465   1              {
+ 466   2                  update_flag=1;//update temp. flag
+ 467   2                      cur_temp=(float)ds_gettmp()/10;
+ 468   2                      time_out_flagleft=0;
+ 469   2                      time_out_flagright=2; 
+ 470   2                      time_out=1;
+ 471   2              }
+ 472   1              time_out=15000;
+ 473   1              flag_hui=1;  //¿ª»ØÁ÷Ë®¹Ü
+ 474   1              while(flag_hui);
+ 475   1              
+ 476   1              while(1)
+ 477   1              {
+ 478   2                  
+ 479   2                      update_flag=1;//update temp
+ 480   2                      cur_temp=(float)ds_gettmp()/10;         
+ 481   2                      temperature_control(tar_temp,cur_temp);
+ 482   2                      if(cur_temp>=tar_temp-0.5&&cur_temp<=tar_temp+2)        //Õı¸º0.5¶ÈÎó²î
+ 483   2                              break;
+ 484   2              }
+ 485   1              flag_hui=2;//¹Ø»ØÁ÷Ë®¹Ü
+ 486   1              while(flag_hui);
+ 487   1              update_flag=0;//¹Ø¸üĞÂÎÂ¶È±êÖ¾
+ 488   1              lcd_clr_info();
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 9   
+
+ 489   1              lcd_show_open();
+ 490   1              delay(1000);
+ 491   1              lcd_clr_open();
+ 492   1              lcd_show_info();
+ 493   1              time_out=15000;
+ 494   1              delay(1000);
+ 495   1          while(1)
+ 496   1              {
+ 497   2                      update_flag=1;//update temp flag
+ 498   2                      cur_temp=(float)ds_gettmp()/10;
+ 499   2      //              flag_wen=1;
+ 500   2      //              temp_last=cur_temp;
+ 501   2      //              while(flag_wen)
+ 502   2      //              {
+ 503   2      //                      delay(50);
+ 504   2      //                      cur_temp=(float)ds_gettmp()/10; 
+ 505   2      //                      if(abs(temp_last-cur_temp)<0.5)
+ 506   2      //                      {
+ 507   2      //                              flag_wen=0;
+ 508   2      //                      }
+ 509   2      //                      temp_last=cur_temp;
+ 510   2      //              }
+ 511   2                      temperature_control(tar_temp,cur_temp);         
+ 512   2                      if(flag_exit==1)                //°´¼ü3Í£Ö¹ÓÃË®
+ 513   2                      {
+ 514   3                              time_out_flagleft=2;
+ 515   3                              time_out_flagright=0;
+ 516   3                                while(motor1_xulie<22000||motor2_xulie<22000) //½áÊøÊ±Á½¸öµç»ú¶¼ÓÒ×ª´òËÀ¹Ø±Õ
+ 517   3                              {
+ 518   4                          update_flag=1;//update temp. flag
+ 519   4                              if(motor1_xulie==22000) 
+ 520   4                                      time_out_flagleft=1;     //×ªµ½µ×¾Í²»×ª
+ 521   4                              if(motor2_xulie==22000) 
+ 522   4                                      time_out_flagright=1;    //×ªµ½µ×¾Í²»×ª
+ 523   4                              time_out=1;
+ 524   4                              }
+ 525   3                              time_out=15000;
+ 526   3                              break;
+ 527   3                      }
+ 528   2              }
+ 529   1              while(1);
+ 530   1      
+ 531   1      }
+ 532          void winter()   //flag_season=1
+ 533          {
+ 534   1      //      uchar flag_wen=0;
+ 535   1      //      float temp_last; 
+ 536   1              yemian=2;
+ 537   1      
+ 538   1              lcd_clr_season();
+ 539   1              lcd_show_info();
+ 540   1      
+ 541   1              while(motor1_xulie>11000&&motor1_xulie<=22000) 
+ 542   1              {
+ 543   2                  update_flag=1;//update temp. flag
+ 544   2                      cur_temp=(float)ds_gettmp()/10;
+ 545   2                      time_out_flagleft=0;   //×óµç»ú×ó×ª
+ 546   2                      time_out_flagright=1; //ÓÒµç»ú²»¶¯ 
+ 547   2                      time_out=1;
+ 548   2              }
+ 549   1              time_out=15000;    //ÖÃ»ØÎŞÏŞ´ó×´Ì¬
+ 550   1              flag_hui=1;  //¿ª»ØÁ÷Ë®¹Ü
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 10  
+
+ 551   1              while(flag_hui);
+ 552   1              while(1)          //µÈ´ıÈÈË®×ã¹»ÈÈ
+ 553   1              {
+ 554   2              update_flag=1;//update flag
+ 555   2                      cur_temp=(float)ds_gettmp()/10;
+ 556   2                      if(cur_temp>=tar_temp&&cur_temp<tar_temp+2) 
+ 557   2                              break;
+ 558   2              } 
+ 559   1              while(motor2_xulie>15000) //ÓÒµç»ú×ó×ª´òĞ¡Ò»°ë(»Øµ½¶¬Ììµç»úÕı³£Î»ÖÃ£¬Ò²¸øºóÃæpidµ÷ÎÂÁôÎ»ÖÃ)
+ 560   1              {
+ 561   2                  update_flag=1;//update temp. flag
+ 562   2                      cur_temp=(float)ds_gettmp()/10;
+ 563   2                      time_out_flagleft=1;    //×óµç»ú²»×ª
+ 564   2                      time_out_flagright=2;   // ÓÒµç»ú×ó×ª
+ 565   2                      time_out=1;
+ 566   2              }
+ 567   1              time_out=15000;
+ 568   1              while(1)           
+ 569   1              {
+ 570   2                      cur_temp=(float)ds_gettmp()/10;
+ 571   2                      temperature_control(tar_temp,cur_temp);
+ 572   2                      if(cur_temp>=tar_temp-0.5&&cur_temp<=tar_temp+0.5)      //Õı¸º0.5¶ÈÎó²î
+ 573   2                              break;
+ 574   2              }
+ 575   1              flag_hui=2;//¹Ø»ØÁ÷Ë®¹Ü
+ 576   1              while(flag_hui);
+ 577   1      
+ 578   1              update_flag=0;//¹Ø¸üĞÂÎÂ¶È±êÖ¾
+ 579   1              lcd_clr_info();
+ 580   1              lcd_show_open();   //ÌáĞÑÓÃ»§ÓÃË®
+ 581   1              delay(1000);
+ 582   1              lcd_clr_open();
+ 583   1              lcd_show_info();
+ 584   1              time_out=15000;
+ 585   1              delay(1000);
+ 586   1              while(1)
+ 587   1              {
+ 588   2                      
+ 589   2                  update_flag=1;//update flag
+ 590   2                      cur_temp=(float)ds_gettmp()/10;
+ 591   2      //              flag_wen=1;
+ 592   2      //              temp_last=cur_temp;
+ 593   2      //              while(flag_wen)
+ 594   2      //              {
+ 595   2      //                      delay(50);
+ 596   2      //                      cur_temp=(float)ds_gettmp()/10; 
+ 597   2      //                      if(abs(temp_last-cur_temp)<0.5)
+ 598   2      //                      {
+ 599   2      //                              flag_wen=0;
+ 600   2      //                      }
+ 601   2      //                      temp_last=cur_temp;
+ 602   2      //              }
+ 603   2                      temperature_control(tar_temp,cur_temp);
+ 604   2                      if(flag_exit==1)                //°´¼ü3Í£Ö¹ÓÃË®
+ 605   2                      {
+ 606   3                              time_out_flagleft=2;
+ 607   3                              time_out_flagright=0;
+ 608   3                                while(motor1_xulie<22000||motor2_xulie<22000) //½áÊøÊ±Á½¸öµç»ú¶¼ÓÒ×ª´òËÀ¹Ø±Õ
+ 609   3                              {
+ 610   4                          update_flag=1;//update temp. flag
+ 611   4                              if(motor1_xulie==22000) 
+ 612   4                                      time_out_flagleft=1;     //×ªµ½µ×¾Í²»×ª
+C51 COMPILER V9.00   MAIN                                                                  04/23/2018 22:22:32 PAGE 11  
+
+ 613   4                              if(motor2_xulie==22000) 
+ 614   4                                      time_out_flagright=1;    //×ªµ½µ×¾Í²»×ª
+ 615   4                              time_out=1;
+ 616   4                              }
+ 617   3                              time_out=15000;
+ 618   3                              break;
+ 619   3                      }
+ 620   2              }
+ 621   1              while(1);
+ 622   1      }
+ 623          void lcd_update_tmp()
+ 624          {
+ 625   1        uchar buf[4];
+ 626   1        //¸üĞÂÄ¿±êÎÂ¶È
+ 627   1        sprintf(buf,"%.1f",tar_temp);
+ 628   1        LCD_ShowString(4*8,1*16+8,buf); 
+ 629   1        //¸üĞÂµ±Ç°ÎÂ¶È 
+ 630   1        sprintf(buf,"%.1f",cur_temp);
+ 631   1        LCD_ShowString(4*8,6*16+8,buf);
+ 632   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3244    ----
+   CONSTANT SIZE    =    223    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =     44       6
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

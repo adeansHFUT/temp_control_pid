@@ -1,0 +1,159 @@
+C51 COMPILER V9.00   E2PROM                                                                04/23/2018 22:22:33 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE E2PROM
+OBJECT MODULE PLACED IN E2PROM.OBJ
+COMPILER INVOKED BY: D:\C51\BIN\C51.EXE E2PROM.c COMPACT BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /******************************
+   2          库函数名称：E2PROM.h
+   3          功能描述：      E2PROM读，写，擦除数据
+   4          硬件连接：  无（单片机内部E2PROM调用）
+   5          维护记录：  2017-4-7
+   6          ******************************/
+   7          #include<reg52.h>
+   8          #include<intrins.h>
+   9          #include"E2PROM.h"
+  10          
+  11          /******************************
+  12          重新定义常用变量类型名
+  13          ******************************/
+  14          #define uchar unsigned char
+  15          #define uint unsigned int
+  16          /*********************
+  17          定义ISP操作命令
+  18          *********************/
+  19          #define RdCommand 0x01 //定义 ISP 的操作命令
+  20          #define PrgCommand 0x02
+  21          #define EraseCommand 0x03
+  22          #define WaitTime 0x01   //定义cpu等待时间
+  23          /*********************
+  24          特殊寄存器申明
+  25          *********************/
+  26          sfr ISP_DATA=0xe2; //寄存器申明
+  27          sfr ISP_ADDRH=0xe3;
+  28          sfr ISP_ADDRL=0xe4;
+  29          sfr ISP_CMD=0xe5;
+  30          sfr ISP_TRIG=0xe6;
+  31          sfr ISP_CONTR=0xe7;
+  32          
+  33          /***************************************************************
+  34          =================打开ISP,IAP功能=============================
+  35          ***************************************************************/
+  36          void ISP_IAP_enable(void)
+  37          {
+  38   1              EA = 0;   /* 关中断*/
+  39   1              ISP_CONTR =ISP_CONTR & 0x18;  /* 0001,1000 复位*/
+  40   1              ISP_CONTR=ISP_CONTR | WaitTime;    /* 写入硬件延时 */
+  41   1              ISP_CONTR=ISP_CONTR | 0x80;               /* ISPEN=1*/     
+  42   1      }
+  43          /***************************************************************
+  44          =================关闭 ISP,IAP 功能=============================
+  45          ***************************************************************/
+  46          void ISP_IAP_disable(void)
+  47          {
+  48   1              ISP_CONTR = ISP_CONTR & 0x7f;   /* ISPEN = 0 */
+  49   1              ISP_TRIG=0x00;
+  50   1              EA=1;    /* 开中断 */
+  51   1      }
+  52          /***************************************************************
+  53          =================公用的触发代码 =============================
+  54          ***************************************************************/
+  55          void ISPgoon(void)
+C51 COMPILER V9.00   E2PROM                                                                04/23/2018 22:22:33 PAGE 2   
+
+  56          {
+  57   1              ISP_IAP_enable();          /* 打开 ISP,IAP 功能 */
+  58   1              ISP_TRIG=0x46; /* 触发 ISP_IAP 命令字节 1*/
+  59   1              ISP_TRIG=0xb9;  /* 触发 ISP_IAP 命令字节 2 */
+  60   1              nop_();
+  61   1      }
+  62          
+  63          /***************************************************************
+  64          ========字节读（给地址，给命令，触发，关闭，返回值） ===========
+  65          ***************************************************************/
+  66          unsigned char byte_read(unsigned int byte_addr)
+  67          {
+  68   1              ISP_ADDRH = (unsigned char)(byte_addr >> 8);/* 地址赋值 */
+  69   1          ISP_ADDRL = (unsigned char)(byte_addr & 0x00ff);
+  70   1              ISP_CMD = ISP_CMD & 0xf8;                                 /* 清除低 3 位*/
+  71   1              ISP_CMD = ISP_CMD | RdCommand;                   /* 写入读命令 */
+  72   1              ISPgoon();                                                                /* 触发执行*/
+  73   1              ISP_IAP_disable();                                               /* 关闭 ISP,IAP 功能 */
+  74   1              return (ISP_DATA);                                               /* 返回读到的数据*/
+  75   1      }
+  76          /***************************************************************
+  77          ==========字节擦除（给地址，给命令，触发，关闭） ================
+  78          ***************************************************************/
+  79          void SectorErase(unsigned int sector_addr)
+  80          {
+  81   1              unsigned int iSectorAddr;
+  82   1              iSectorAddr = (sector_addr & 0xfe00);   /* 取扇区地址 */
+  83   1              ISP_ADDRH = (unsigned char)(iSectorAddr >> 8);
+  84   1              ISP_ADDRL = 0x00;
+  85   1              ISP_CMD  = ISP_CMD & 0xf8;                                /* 清空低 3 位*/
+  86   1          ISP_CMD     = ISP_CMD | EraseCommand;               /* 擦除命令 3*/
+  87   1          ISPgoon();                                                                  /* 触发执行*/
+  88   1              ISP_IAP_disable();                                                /* 关闭 ISP,IAP 功能 */
+  89   1      }
+  90          /***************************************************************
+  91          ========字节写 （给地址，给命令，给数据，触发，关闭）===========
+  92          ***************************************************************/
+  93          void byte_write(unsigned int byte_addr, unsigned char original_data)
+  94          {
+  95   1              ISP_ADDRH =     (unsigned char)(byte_addr >> 8); /* 取地址*/
+  96   1              ISP_ADDRL =     (unsigned char)(byte_addr & 0x00ff);
+  97   1              ISP_CMD  = ISP_CMD & 0xf8;                                                /* 清低 3 位 */
+  98   1              ISP_CMD = ISP_CMD | PrgCommand;                                  /* 写命令 2 */
+  99   1              ISP_DATA = original_data;                                               /* 写入数据准备 */
+ 100   1              ISPgoon();                                                                        /* 触发执行*/
+ 101   1              ISP_IAP_disable();                                                 /* 关闭 IAP 功能 */
+ 102   1      }
+ 103          /***************************************************************
+ 104          ========字读 （双字节）===========
+ 105          ***************************************************************/
+ 106          unsigned int word_read(unsigned int byte_addr)
+ 107          {
+ 108   1              uint word;
+ 109   1              uchar lbyte,hbyte;
+ 110   1              lbyte=byte_read(byte_addr);
+ 111   1              hbyte=byte_read(byte_addr+1);
+ 112   1              word=hbyte;
+ 113   1              word<<=8;
+ 114   1              word|=lbyte;
+ 115   1              return word;
+ 116   1      }
+ 117          /***************************************************************
+C51 COMPILER V9.00   E2PROM                                                                04/23/2018 22:22:33 PAGE 3   
+
+ 118          ========字写 （双字节）===========
+ 119          ***************************************************************/
+ 120          void word_write(unsigned int byte_addr, unsigned int original_data)
+ 121          {
+ 122   1              uchar lbyte,hbyte;
+ 123   1              lbyte=original_data&0x00ff;
+ 124   1              original_data>>=8;
+ 125   1              hbyte=original_data;
+ 126   1              SectorErase(byte_addr);
+ 127   1              byte_write(byte_addr,lbyte);
+ 128   1      //      SectorErase(byte_addr+1);
+ 129   1              byte_write(byte_addr+1,hbyte);
+ 130   1      }
+ 131          
+ 132          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    165    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

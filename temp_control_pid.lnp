@@ -1,0 +1,11 @@
+"main.obj",
+"STARTUP.obj",
+"pid.obj",
+"lanya.obj",
+"ds18b20.obj",
+"E2PROM.obj",
+"font.obj",
+"lcd.obj",
+"sys.obj" 
+TO "temp_control_pid" 
+RAMSIZE(256) 
